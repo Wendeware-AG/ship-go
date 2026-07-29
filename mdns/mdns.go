@@ -64,6 +64,9 @@ type MdnsManager struct {
 	mdnsProvider api.MdnsProviderInterface
 
 	shutdownOnce sync.Once
+	// shutdownC is closed by Shutdown() to signal the signal-handler goroutine
+	// (started in Start()) to exit, preventing it from leaking across service restarts.
+	shutdownC chan struct{}
 
 	providerSelection MdnsProviderSelection
 
@@ -87,6 +90,7 @@ func NewMDNS(
 		ifaces:            ifaces,
 		providerSelection: providerSelection,
 		entries:           make(map[string]*api.MdnsEntry),
+		shutdownC:         make(chan struct{}),
 	}
 
 	return m
@@ -163,10 +167,13 @@ func (m *MdnsManager) Start(cb api.MdnsReportInterface) error {
 	go func() {
 		signalC := make(chan os.Signal, 1)
 		signal.Notify(signalC, os.Interrupt, syscall.SIGTERM)
-
-		<-signalC // wait for signal
-
-		m.Shutdown()
+		defer signal.Stop(signalC)
+		select {
+		case <-signalC:
+			m.Shutdown()
+		case <-m.shutdownC:
+			// Shutdown() was called directly (e.g. service restart); exit cleanly.
+		}
 	}()
 
 	return nil
@@ -175,6 +182,10 @@ func (m *MdnsManager) Start(cb api.MdnsReportInterface) error {
 // Shutdown all of mDNS
 func (m *MdnsManager) Shutdown() {
 	m.shutdownOnce.Do(func() {
+		// Close shutdownC first so the signal-handler goroutine (started in Start)
+		// exits cleanly instead of leaking until an OS signal arrives.
+		close(m.shutdownC)
+
 		m.UnannounceMdnsEntry()
 
 		if m.mdnsProvider == nil {

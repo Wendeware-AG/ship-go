@@ -47,6 +47,10 @@ func (z *ZeroconfProvider) Shutdown() {
 }
 
 func (z *ZeroconfProvider) Announce(serviceName string, port int, txt []string) error {
+	// Shut down any previously registered server before creating a new one.
+	// Without this, each re-announcement leaks the old server's recv4/recv6 goroutines.
+	z.Unannounce()
+
 	logging.Log().Debug("mdns: using zeroconf")
 
 	// use Zeroconf library if avahi is not available
