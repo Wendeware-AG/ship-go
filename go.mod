@@ -1,9 +1,10 @@
-module github.com/enbility/ship-go
+module github.com/Wendeware-AG/ship-go
 
 go 1.22.0
 
 require (
 	github.com/enbility/go-avahi v0.0.0-20240909195612-d5de6b280d7a
+	github.com/enbility/ship-go v0.6.0
 	github.com/enbility/zeroconf/v2 v2.0.0-20240920094356-be1cae74fda6
 	github.com/gorilla/websocket v1.5.3
 	github.com/stretchr/testify v1.9.0
